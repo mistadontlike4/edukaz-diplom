@@ -1,8 +1,16 @@
 <?php
 include("db.php");
+session_start();
+$csrf_token = isset($_SESSION['csrf_token']) ? $_SESSION['csrf_token'] : bin2hex(random_bytes(32));
+if (!isset($_SESSION['csrf_token'])) {
+  $_SESSION['csrf_token'] = $csrf_token;
+}
 $message = "";
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
+  if (!isset($_POST['csrf_token']) || !isset($_SESSION['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+    die("CSRF token mismatch");
+  }
   $u = trim($_POST['username']);
   $e = trim($_POST['email']);
   $p = password_hash($_POST['password'], PASSWORD_BCRYPT);
@@ -37,6 +45,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <div class="card">
   <h2>Регистрация</h2>
   <form method="post">
+    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
     <input type="text" name="username" placeholder="Логин" required>
     <input type="email" name="email" placeholder="Email" required>
     <input type="password" name="password" placeholder="Пароль" required>

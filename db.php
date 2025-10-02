@@ -1,7 +1,7 @@
 <?php
-$host = "localhost";
-$user = "root"; // или свой логин
-$pass = "";     // или свой пароль
+$host = "db";
+$user = "edukaz_user"; // логин из docker-compose.yml
+$pass = "edukaz_pass"; // пароль из docker-compose.yml
 $db   = "edukaz";
 
 $conn = new mysqli($host, $user, $pass, $db);

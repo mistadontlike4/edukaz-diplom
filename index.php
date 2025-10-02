@@ -1,14 +1,12 @@
 <?php
 include("db.php");
 session_start();
-
 if (!isset($_SESSION['user_id'])) {
-    header("Location: login.php");
-    exit;
+  header("Location: login.php");
+  exit;
 }
-
-$user_id = $_SESSION['user_id'];
-$role = $_SESSION['role'];
+$user_id = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : null;
+$role = isset($_SESSION['role']) ? $_SESSION['role'] : null;
 
 // Берём список файлов
 $stmt = $conn->prepare("
@@ -19,7 +17,7 @@ $stmt = $conn->prepare("
     WHERE 
         f.access_type = 'public'
         OR (f.access_type = 'private' AND f.uploaded_by = ?)
-        OR (f.access_type = 'shared' AND (f.shared_with = ? OR f.uploaded_by = ?))
+  OR (f.access_type = 'user' AND (f.shared_with = ? OR f.uploaded_by = ?))
     ORDER BY f.id DESC
 ");
 $stmt->bind_param("iii", $user_id, $user_id, $user_id);
@@ -54,7 +52,7 @@ $result = $stmt->get_result();
             🌍 Публичный
           <?php elseif ($row['access_type']==='private'): ?>
             🔒 Личный
-          <?php elseif ($row['access_type']==='shared'): ?>
+          <?php elseif ($row['access_type']==='user'): ?>
             👤 Для <?= htmlspecialchars($row['shared_user'] ?? "удалённого пользователя") ?>
           <?php endif; ?>
         </td>
