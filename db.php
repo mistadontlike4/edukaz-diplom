@@ -1,5 +1,5 @@
 <?php
-$host = "db";
+$host = getenv('DB_HOST') ?: (getenv('RENDER') ? 'localhost' : 'db');
 $user = "edukaz_user"; // логин из docker-compose.yml
 $pass = "edukaz_pass"; // пароль из docker-compose.yml
 $db   = "edukaz";
