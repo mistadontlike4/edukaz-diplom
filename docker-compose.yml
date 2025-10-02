@@ -3,10 +3,9 @@ version: '3.8'
 services:
   web:
     build: .
+    container_name: edukaz_web
     ports:
       - "8080:80"
-    volumes:
-      - .:/var/www/html
     environment:
       - TZ=Europe/Moscow
     depends_on:
@@ -14,6 +13,7 @@ services:
 
   db:
     image: mysql:8.0
+    container_name: edukaz_db
     restart: always
     environment:
       MYSQL_DATABASE: edukaz
