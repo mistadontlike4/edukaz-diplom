@@ -1,0 +1,39 @@
+# Ignore system files
+.DS_Store
+Thumbs.db
+
+# Ignore PHPStorm and VSCode settings
+.idea/
+.vscode/
+
+# Ignore node_modules (if any)
+node_modules/
+
+# Ignore log files
+*.log
+
+# Ignore uploads directory
+uploads/
+
+# Ignore environment files
+.env
+.env.*
+
+# Ignore composer dependencies (if used)
+vendor/
+
+# Ignore XAMPP specific files
+*.bak
+*.tmp
+
+# Ignore OS generated files
+*.swp
+*.swo
+
+# Ignore test output
+coverage/
+
+# Ignore other backup files
+*~
+*.bak
+*.tmp

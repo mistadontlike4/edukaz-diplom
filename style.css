@@ -1,0 +1,153 @@
+/* ===== Общие стили ===== */
+body {
+  font-family: "Segoe UI", Arial, sans-serif;
+  background: #f5f7fa;
+  margin: 0;
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+}
+
+/* ===== Карточки ===== */
+.card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 20px;
+  margin: 15px auto;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  width: 90%;
+  max-width: 1000px;
+}
+
+h2 {
+  margin-bottom: 20px;
+  color: #333;
+  text-align: center;
+}
+
+/* ===== Формы ===== */
+input, select, textarea {
+  width: 100%;
+  padding: 10px;
+  margin: 8px 0;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: #007bff;
+  outline: none;
+  box-shadow: 0 0 4px rgba(0,123,255,0.4);
+}
+
+/* Компактные поля (например, для изменения адресата) */
+.input-small {
+  width: auto;
+  padding: 6px 10px;
+  font-size: 14px;
+}
+
+/* ===== Кнопки ===== */
+.btn, button {
+  display: inline-block;
+  padding: 8px 14px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  transition: 0.3s;
+  cursor: pointer;
+  border: none;
+  margin: 3px;
+}
+
+.btn:hover, button:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.btn-success { background: #28a745; color: #fff; }
+.btn-danger  { background: #dc3545; color: #fff; }
+.btn-warning { background: #ffc107; color: #000; }
+.btn         { background: #007bff; color: #fff; }
+
+/* ===== Таблицы ===== */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 15px;
+}
+
+th, td {
+  padding: 12px;
+  text-align: center;
+  border-bottom: 1px solid #eee;
+}
+
+th {
+  background: #f3f6fa;
+  font-weight: bold;
+}
+
+tr:nth-child(even) {
+  background: #fafafa;
+}
+
+tr:hover {
+  background: #f1f1f1;
+}
+
+/* ===== Инлайн форма в таблице ===== */
+.inline-form {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+}
+
+/* ===== Сообщения ===== */
+.msg {
+  margin-top: 15px;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.msg.error {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.msg.success {
+  background: #d4edda;
+  color: #155724;
+}
+
+/* ===== Кнопки внизу страниц ===== */
+.footer-buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+}
+
+/* ===== Адаптив ===== */
+@media (max-width: 768px) {
+  .card {
+    width: 95%;
+    padding: 15px;
+  }
+  table {
+    font-size: 12px;
+  }
+  th, td {
+    padding: 8px;
+  }
+  .footer-buttons {
+    flex-direction: column;
+    gap: 10px;
+  }
+}
