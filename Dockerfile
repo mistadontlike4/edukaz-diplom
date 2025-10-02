@@ -9,4 +9,7 @@ RUN a2enmod rewrite
 # Настройка прав доступа
 RUN chown -R www-data:www-data /var/www/html
 
+# Установить index.php как индексный файл
+RUN echo "DirectoryIndex index.php index.html" > /etc/apache2/conf-enabled/directoryindex.conf
+
 EXPOSE 80
