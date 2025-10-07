@@ -1,13 +1,14 @@
 <?php
-$host = getenv('DB_HOST') ?: (getenv('RENDER') ? '127.0.0.1' : 'db');
-$user = "edukaz_user"; // логин из docker-compose.yml
-$pass = "edukaz_pass"; // пароль из docker-compose.yml
-$db   = "edukaz";
+$host = getenv('DB_HOST') ?: "dpg-d3ia3cc9c44c73ajuq6g-a.render.com" ;
+$user = "admin"; // логин из docker-compose.yml
+$pass = "GsZxkEXSahECU0kGEkeEqjGXDezH8FNn"; // пароль из docker-compose.yml
+$db   = "edukazdb";
 
-$conn = new mysqli($host, $user, $pass, $db);
 
-if ($conn->connect_error) {
-    die("Ошибка подключения: " . $conn->connect_error);
+// Используем расширение pgsql для PostgreSQL
+$conn = pg_connect("host=$host dbname=$db user=$user password=$pass");
+if (!$conn) {
+    die("Ошибка подключения: " . pg_last_error());
 }
-$conn->set_charset("utf8mb4");
 ?>
+

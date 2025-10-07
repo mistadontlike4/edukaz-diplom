@@ -11,19 +11,19 @@ services:
     depends_on:
       - db
 
+
   db:
-    image: mysql:8.0
+    image: postgres:17
     container_name: edukaz_db
     restart: always
     environment:
-      MYSQL_DATABASE: edukaz
-      MYSQL_USER: edukaz_user
-      MYSQL_PASSWORD: edukaz_pass
-      MYSQL_ROOT_PASSWORD: rootpass
+      POSTGRES_DB: edukaz-db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: GsZxkEXSahECU0kGEkeEqjGXDezH8FNn
     ports:
-      - "3306:3306"
+      - "5432:5432"
     volumes:
-      - db_data:/var/lib/mysql
+      - db_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
 
 volumes:
