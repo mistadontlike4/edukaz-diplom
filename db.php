@@ -1,16 +1,19 @@
 <?php
+$url = getenv('DATABASE_URL');
+$db = parse_url($url);
 
-$host = getenv('DB_HOST') ?: 'db';
-$user = "admin"; // логин из docker-compose.yml
-$pass = "GsZxkEXSahECU0kGEkeEqjGXDezH8FNn"; // пароль из docker-compose.yml
-$db   = "edukazdb";
+$host = $db['host'];
+$port = $db['port'];
+$user = $db['user'];
+$pass = $db['pass'];
+$name = ltrim($db['path'], '/');
 
+$conn = pg_connect("host=$host port=$port dbname=$name user=$user password=$pass");
 
-// Используем расширение pgsql для PostgreSQL
-
-$conn = pg_connect("host=$host dbname=$db user=$user password=$pass");
 if (!$conn) {
-    die("Ошибка подключения: " . pg_last_error());
+    die("❌ Ошибка подключения: " . pg_last_error());
 }
+echo "✅ Подключение к PostgreSQL установлено!";
 ?>
+
 

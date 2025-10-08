@@ -17,7 +17,7 @@ services:
     container_name: edukaz_db
     restart: always
     environment:
-      POSTGRES_DB: edukaz-db
+      POSTGRES_DB: edukazdb
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: GsZxkEXSahECU0kGEkeEqjGXDezH8FNn
     ports:
