@@ -11,4 +11,5 @@ if (!$conn) {
     die("Ошибка подключения: " . pg_last_error());
 }
 ?>
+$host = getenv('DB_HOST') ?: 'db';
 
