@@ -1,36 +1,40 @@
 <?php
-$url = getenv('DATABASE_URL');
+// ✅ Подключение к PostgreSQL Railway
 
-if (!$url) {
-    die("❌ Переменная DATABASE_URL не найдена в окружении!");
-}
+// Строка подключения (можно хранить в переменной окружения DATABASE_URL)
+$url = "postgresql://postgres:USLLNRHbFMSNNdOUnAxkbHxbkfpsmQGu@postgres.railway.internal:5432/railway";
 
-// echo "<p>📦 DATABASE_URL: $url</p>";
-
+// Разбираем URL на составляющие
 $db = parse_url($url);
 
 if (!$db || !isset($db['host'])) {
-    die("❌ Ошибка парсинга DATABASE_URL. Проверь формат: postgres://user:pass@host:port/dbname");
+    die("❌ Ошибка парсинга строки подключения!");
 }
 
+$host = $db['host'];
+$port = $db['port'] ?? '5432';
+$user = $db['user'];
+$pass = $db['pass'];
+$name = ltrim($db['path'], '/');
 
-$host = isset($db['host']) ? $db['host'] : '';
-$port = isset($db['port']) ? $db['port'] : '5432';
-$user = isset($db['user']) ? $db['user'] : '';
-$pass = isset($db['pass']) ? $db['pass'] : '';
-$name = isset($db['path']) ? ltrim($db['path'], '/') : '';
+// Формируем строку подключения для pg_connect
+$conn_str = "host=$host port=$port dbname=$name user=$user password=$pass";
 
-if (!$host || !$user || !$pass || !$name) {
-    die("❌ Не все параметры подключения определены! Проверьте DATABASE_URL.");
-}
-
-// echo "<p>🔗 Подключение к: $host:$port / БД: $name / Пользователь: $user</p>";
-
-$conn = pg_connect("host=$host port=$port dbname=$name user=$user password=$pass");
+// Пробуем подключиться
+$conn = pg_connect($conn_str);
 
 if (!$conn) {
     die("❌ Ошибка подключения: " . pg_last_error());
 }
 
-// echo "✅ Подключение к PostgreSQL установлено!";
+// ✅ Проверка соединения
+$result = pg_query($conn, "SELECT version();");
+if ($result) {
+    $row = pg_fetch_row($result);
+    echo "✅ Подключение успешно! PostgreSQL версия: " . $row[0];
+} else {
+    echo "⚠️ Подключение установлено, но не удалось получить версию PostgreSQL.";
+}
+
+pg_close($conn);
 ?>
