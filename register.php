@@ -22,8 +22,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $u = trim($_POST['username'] ?? '');
     $e = trim($_POST['email'] ?? '');
     $p_raw = $_POST['password'] ?? '';
+    $p_confirm = $_POST['password_confirm'] ?? '';
 
-    if (empty($u) || empty($e) || empty($p_raw)) {
+    // Серверная проверка совпадения паролей
+    if ($p_raw !== $p_confirm) {
+        $message = "ваши пароли не одинаковые";
+    } elseif (empty($u) || empty($e) || empty($p_raw)) {
         $message = "Пожалуйста, заполните все поля!";
     } else {
         $p = password_hash($p_raw, PASSWORD_BCRYPT);
@@ -45,7 +49,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             // Вставка нового пользователя
             $insert = pg_query_params(
                 $conn,
-                "INSERT INTO users (username, email, password, role) VALUES ($1, $2, $3, 'user')",
+                "INSERT INTO users (username, email, password, role, created_at) VALUES ($1, $2, $3, 'user', NOW())",
                 [$u, $e, $p]
             );
 
@@ -65,24 +69,28 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
   <meta charset="UTF-8">
   <title>Регистрация</title>
   <link rel="stylesheet" href="style.css">
-</head>
-<body>
-<div class="card">
-  <h2>🧾 Регистрация</h2>
-  <?php if ($message): ?>
-    <div class="error"><?= htmlspecialchars($message) ?></div>
-  <?php endif; ?>
-  <form method="post">
-    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
-    <input type="text" name="username" placeholder="Логин" required>
-    <input type="email" name="email" placeholder="Email" required>
-    <input type="password" name="password" placeholder="Пароль" required>
-    <button type="submit" class="btn btn-success">Зарегистрироваться</button>
-  </form>
-  <div class="nav">
-    Уже есть аккаунт?
-    <a class="btn" href="login.php">Войти</a>
-  </div>
-</div>
-</body>
-</html>
+  <style>
+    /* Небольшие стили для ошибки */
+    .error { color: #b00020; background:#ffecec; padding:10px; border-radius:6px; margin-bottom:10px; }
+    .form-row { margin-bottom:12px; }
+    input[type="text"], input[type="email"], input[type="password"] { width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box; }
+    .btn { display:inline-block; padding:8px 14px; border-radius:6px; background:#0d6efd; color:#fff; text-decoration:none; border:none; cursor:pointer; }
+    .btn-success { background:#0d6efd; }
+  </style>
+  <script>
+    // Клиентская проверка: пароль и подтверждение
+    function validateForm(event) {
+      var p = document.getElementById('password').value;
+      var pc = document.getElementById('password_confirm').value;
+      var errBox = document.getElementById('client_error');
+      if (p !== pc) {
+        errBox.textContent = 'ваши пароли не одинаковые';
+        errBox.style.display = 'block';
+        event.preventDefault();
+        return false;
+      }
+      errBox.style.display = 'none';
+      return true;
+    }
+
+    // У
