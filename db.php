@@ -45,3 +45,9 @@ if ($using_backup) {
 } else {
     error_log("✅ Подключено к Railway PostgreSQL.");
 }
+// if ($using_backup) {
+//     echo "<p style='color:orange'>⚠️ Railway недоступен. Используется локальная база.</p>";
+// } else {
+//     echo "<p style='color:green'>✅ Подключено к Railway PostgreSQL.</p>";
+// }
+
