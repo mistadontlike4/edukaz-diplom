@@ -53,6 +53,27 @@ $log_content = file_exists($logfile) ? file($logfile, FILE_IGNORE_NEW_LINES | FI
   .btn-danger:hover { background:#c0392b; }
   .btn-success { background:#2ecc71; }
   .btn-success:hover { background:#27ae60; }
+
+  /* Сообщение об успешной/ошибочной синхронизации */
+  .alert {
+    text-align:center;
+    padding:10px;
+    border-radius:8px;
+    margin:10px auto;
+    width:90%;
+    max-width:800px;
+    color:white;
+    font-weight:bold;
+    animation: fadeOut 5s forwards;
+  }
+  .success { background:#2ecc71; }
+  .error { background:#e74c3c; }
+
+  @keyframes fadeOut {
+    0% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { opacity: 0; display:none; }
+  }
 </style>
 <script>
 function openTab(tabId) {
@@ -62,6 +83,12 @@ function openTab(tabId) {
 </script>
 </head>
 <body>
+
+<?php if (isset($_GET['sync'])): ?>
+<div class="alert <?= $_GET['sync']=='success' ? 'success' : 'error' ?>">
+  <?= $_GET['sync']=='success' ? '✅ Синхронизация успешно выполнена!' : '❌ Ошибка при синхронизации!' ?>
+</div>
+<?php endif; ?>
 
 <div class="card" style="width:90%;max-width:1100px;margin:auto;">
   <h2 style="text-align:center;">👑 Админ-панель EduKaz</h2>
