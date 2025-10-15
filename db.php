@@ -46,9 +46,9 @@ if (!$conn) {
 } else {
     $db_status = "<span style='color:green'>✅ Подключено к Railway PostgreSQL.</span>";
 }
-?>
 if ($conn) {
     echo "<p style='color:green;'>✅ Подключение успешно к: " . ($is_local ? "локальной базе" : "Railway PostgreSQL") . "</p>";
 } else {
     echo "<p style='color:red;'>❌ Ошибка подключения к базе данных.</p>";
 }
+?>
