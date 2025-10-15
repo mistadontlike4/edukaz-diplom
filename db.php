@@ -2,22 +2,23 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-// Флаг для определения режима
+// === Инициализация переменных ===
 $is_local = false;
 $conn = false;
+$db_status = "";
 
-// 1️⃣ Пробуем Railway
+// === 1️⃣ Пытаемся подключиться к Railway PostgreSQL ===
 if (getenv("DATABASE_URL")) {
     $url = getenv("DATABASE_URL");
 } else {
-    // Можно задать вручную, если нет переменной окружения
+    // Можно задать вручную, если Railway переменной нет
     $url = "postgresql://postgres:USLLNRHbFMSNNdOUnAxkbHxbkfpsmQGu@interchange.proxy.rlwy.net:54049/railway";
 }
 
 try {
     $db = parse_url($url);
     if (!$db || !isset($db['host'])) {
-        throw new Exception("Некорректный формат DATABASE_URL");
+        throw new Exception("❌ Некорректный формат DATABASE_URL");
     }
 
     $host = $db['host'];
@@ -30,11 +31,14 @@ try {
 
     if ($conn) {
         $is_local = false;
+        $db_status = "<div style='color:green;font-weight:bold;text-align:center;'>🟢 Railway PostgreSQL подключён</div>";
     } else {
-        throw new Exception("Не удалось подключиться к Railway PostgreSQL");
+        throw new Exception("⚠️ Не удалось подключиться к Railway PostgreSQL");
     }
+
 } catch (Throwable $e) {
-    // 2️⃣ Переход на локальную базу
+
+    // === 2️⃣ Автоматический переход на локальную базу ===
     $is_local = true;
     $host = "localhost";
     $port = "5432";
@@ -43,6 +47,17 @@ try {
     $name = "edukaz_backup";
 
     $conn = @pg_connect("host=$host port=$port dbname=$name user=$user password=$pass");
+
+    if ($conn) {
+        $db_status = "<div style='color:orange;font-weight:bold;text-align:center;'>🟠 Railway недоступен, используется локальная база (edukaz_backup)</div>";
+    } else {
+        $db_status = "<div style='color:red;font-weight:bold;text-align:center;'>🔴 Ошибка: ни Railway, ни локальная база недоступны!</div>";
+    }
 }
 
-
+// === 3️⃣ Проверка подключения ===
+if (!$conn) {
+    echo $db_status;
+    exit("<p style='color:red;text-align:center;'>❌ Подключение к базе данных не удалось. Проверь настройки.</p>");
+}
+?>
