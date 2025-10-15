@@ -1,61 +1,64 @@
 <?php
-include("db.php");
 session_start();
-$csrf_token = isset($_SESSION['csrf_token']) ? $_SESSION['csrf_token'] : bin2hex(random_bytes(32));
-if (!isset($_SESSION['csrf_token'])) {
-  $_SESSION['csrf_token'] = $csrf_token;
+require_once "db.php";
+
+// Если пользователь уже вошёл — перенаправляем
+if (isset($_SESSION['user_id'])) {
+    header("Location: index.php");
+    exit;
 }
-$message = "";
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-  if (!isset($_POST['csrf_token']) || !isset($_SESSION['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
-    die("CSRF token mismatch");
-  }
-  $u = $_POST['username'];
-  $p = $_POST['password'];
+$error = "";
 
-  $stmt = $conn->prepare("SELECT id,password,role FROM users WHERE username=? OR email=?");
-  $stmt->bind_param("ss", $u, $u);
-  $stmt->execute();
-  $stmt->store_result();
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $username = trim($_POST['username'] ?? '');
+    $password = $_POST['password'] ?? '';
 
-  if ($stmt->num_rows > 0) {
-    $stmt->bind_result($id, $hash, $role);
-    $stmt->fetch();
-    if (password_verify($p, $hash)) {
-      $_SESSION['user_id'] = $id;
-      $_SESSION['username'] = $u;
-      $_SESSION['role'] = $role;
-      header("Location: index.php");
-      exit;
+    if (empty($username) || empty($password)) {
+        $error = "Введите логин и пароль.";
     } else {
-      $message = "Неверный пароль!";
+        // Проверяем наличие пользователя
+        $query = "SELECT id, username, password, role FROM users WHERE username = $1";
+        $result = pg_query_params($conn, $query, [$username]);
+
+        if (!$result) {
+            die("Ошибка запроса: " . pg_last_error($conn));
+        }
+
+        $user = pg_fetch_assoc($result);
+        if ($user && password_verify($password, $user['password'])) {
+            // Создаём сессию
+            $_SESSION['user_id'] = $user['id'];
+            $_SESSION['username'] = $user['username'];
+            $_SESSION['role'] = $user['role'];
+
+            header("Location: index.php");
+            exit;
+        } else {
+            $error = "❌ Неверный логин или пароль.";
+        }
     }
-  } else {
-    $message = "Пользователь не найден!";
-  }
 }
 ?>
 <!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Вход</title>
+  <title>Вход в систему</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="card">
-  <h2>Вход</h2>
+  <h2>🔐 Вход в систему EduKaz</h2>
+  <?php if ($error): ?>
+    <div class="error"><?= htmlspecialchars($error) ?></div>
+  <?php endif; ?>
   <form method="post">
-    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
-    <input type="text" name="username" placeholder="Логин или Email" required>
+    <input type="text" name="username" placeholder="Логин" required>
     <input type="password" name="password" placeholder="Пароль" required>
-    <button type="submit">Войти</button>
+    <button type="submit" class="btn btn-success">Войти</button>
   </form>
-  <div class="nav">
-    Нет аккаунта? <a class="btn" href="register.php">Зарегистрироваться</a>
-  </div>
-  <?php if($message): ?><p class="msg error"><?= $message ?></p><?php endif; ?>
+  <p>Нет аккаунта? <a href="register.php">Зарегистрироваться</a></p>
 </div>
 </body>
 </html>

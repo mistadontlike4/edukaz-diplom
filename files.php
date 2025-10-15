@@ -1,49 +1,48 @@
 <?php
 session_start();
-include("db.php");
+require_once "db.php";
 
+// Проверка авторизации
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit;
 }
 
+$user_id = $_SESSION['user_id'];
+$role = $_SESSION['role'] ?? 'user';
+
 // Удаление файла (только для админа)
-if (isset($_GET['delete']) && $_SESSION['role'] === 'admin') {
+if (isset($_GET['delete']) && $role === 'admin') {
     $file_id = intval($_GET['delete']);
 
-    // находим путь к файлу
-    $stmt = $conn->prepare("SELECT filepath FROM files WHERE id = ?");
-    $stmt->bind_param("i", $file_id);
-    $stmt->execute();
-    $stmt->bind_result($filepath);
-    if ($stmt->fetch()) {
+    // Получаем путь к файлу
+    $res = pg_query_params($conn, "SELECT filename FROM files WHERE id = $1", [$file_id]);
+    if ($res && ($row = pg_fetch_assoc($res))) {
+        $filepath = "uploads/" . $row['filename'];
         if (file_exists($filepath)) {
             unlink($filepath); // удаляем сам файл с диска
         }
     }
-    $stmt->close();
 
-    // удаляем запись из БД
-    $stmt = $conn->prepare("DELETE FROM files WHERE id = ?");
-    $stmt->bind_param("i", $file_id);
-    $stmt->execute();
-    $stmt->close();
+    // Удаляем запись из БД
+    pg_query_params($conn, "DELETE FROM files WHERE id = $1", [$file_id]);
 
     header("Location: files.php");
     exit;
 }
 
-// Достаём список файлов
-$result = $conn->query("
-    SELECT f.id, f.filename, f.filepath, f.is_public, f.uploaded_at, u.username
+// Получаем список файлов
+$query = "
+    SELECT f.id, f.filename, f.original_name, f.access_type, f.uploaded_at, u.username
     FROM files f
     JOIN users u ON f.uploaded_by = u.id
-    WHERE f.is_public = 1 OR f.uploaded_by = {$_SESSION['user_id']}
+    WHERE f.access_type = 'public' OR f.uploaded_by = $1
     ORDER BY f.uploaded_at DESC
-");<?php
-include("db.php");
-if(!isset($_SESSION['user_id'])){ header("Location: login.php"); exit; }
-$res=$conn->query("SELECT f.*, u.username FROM files f JOIN users u ON f.uploaded_by=u.id ORDER BY uploaded_at DESC");
+";
+$result = pg_query_params($conn, $query, [$user_id]);
+if (!$result) {
+    die("Ошибка запроса: " . pg_last_error($conn));
+}
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -56,13 +55,33 @@ $res=$conn->query("SELECT f.*, u.username FROM files f JOIN users u ON f.uploade
 <div class="card" style="max-width:900px; width:95%; text-align:left;">
   <h2>📂 Список файлов</h2>
   <table class="file-list">
-    <tr><th>Имя файла</th><th>Загрузил</th><th>Дата</th><th>Скачать</th></tr>
-    <?php while($f=$res->fetch_assoc()): ?>
+    <tr>
+      <th>Имя файла</th>
+      <th>Загрузил</th>
+      <th>Тип доступа</th>
+      <th>Дата</th>
+      <th>Действия</th>
+    </tr>
+    <?php while ($f = pg_fetch_assoc($result)): ?>
     <tr>
       <td><?= htmlspecialchars($f['original_name']) ?></td>
       <td><?= htmlspecialchars($f['username']) ?></td>
-      <td><?= $f['uploaded_at'] ?></td>
-      <td><a class="btn ok" href="<?= $f['filename'] ?>" download>⬇ Скачать</a></td>
+      <td>
+        <?php if ($f['access_type'] === 'public'): ?>
+          🌍 Публичный
+        <?php elseif ($f['access_type'] === 'private'): ?>
+          🔒 Личный
+        <?php else: ?>
+          👤 Для пользователя
+        <?php endif; ?>
+      </td>
+      <td><?= htmlspecialchars($f['uploaded_at']) ?></td>
+      <td>
+        <a class="btn ok" href="download.php?id=<?= $f['id'] ?>">⬇ Скачать</a>
+        <?php if ($role === 'admin'): ?>
+          <a class="btn danger" href="files.php?delete=<?= $f['id'] ?>" onclick="return confirm('Удалить файл?')">🗑 Удалить</a>
+        <?php endif; ?>
+      </td>
     </tr>
     <?php endwhile; ?>
   </table>
