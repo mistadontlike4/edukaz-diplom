@@ -16,4 +16,4 @@ if (!$conn) {
     die("❌ Ошибка подключения: " . pg_last_error());
 }
 
-// ⚠️ Не добавляй echo, print_r, var_dump или ?> в конце
+// ⚠️ Не добавляй echo, print_r, var_dump или в конце
