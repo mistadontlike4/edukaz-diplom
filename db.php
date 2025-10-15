@@ -41,8 +41,7 @@ if (!$conn) {
 
 // Выводим сообщение только если подключение успешно
 if ($using_backup) {
-    echo "<p style='color:orange'>⚠️ Railway недоступен. Используется локальная база.</p>";
+    error_log("⚠️ Railway недоступен. Используется локальная база.");
 } else {
-    echo "<p style='color:green'>✅ Подключено к Railway PostgreSQL.</p>";
+    error_log("✅ Подключено к Railway PostgreSQL.");
 }
-?>
