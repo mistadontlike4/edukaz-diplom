@@ -51,3 +51,31 @@ foreach ($tables as $table) {
 
 file_put_contents($logfile, "[$time] ✅ Синхронизация завершена успешно.\n", FILE_APPEND);
 ?>
+<?php
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+echo "🚀 Инициализация синхронизации...<br>";
+
+include("db.php");
+
+// Проверка соединения
+if (pg_connection_status($conn) !== PGSQL_CONNECTION_OK) {
+    die("❌ Ошибка подключения к базе данных: " . pg_last_error($conn));
+}
+
+// Пример простой проверки таблицы users
+$result = @pg_query($conn, "SELECT COUNT(*) AS total FROM users;");
+if (!$result) {
+    die("❌ Ошибка при запросе: " . pg_last_error($conn));
+}
+
+$count = pg_fetch_assoc($result)['total'];
+echo "✅ База подключена, пользователей найдено: $count<br>";
+
+// Логирование результата
+$log = "[" . date("Y-m-d H:i:s") . "] ✅ Синхронизация выполнена вручную.";
+file_put_contents(__DIR__ . "/sync_log.txt", $log . PHP_EOL, FILE_APPEND);
+
+echo "<p style='color:green;'>Готово! Запись добавлена в sync_log.txt</p>";
+?>
