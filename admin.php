@@ -54,7 +54,11 @@ $log_content = file_exists($logfile) ? file($logfile, FILE_IGNORE_NEW_LINES | FI
   .btn-success { background:#2ecc71; }
   .btn-success:hover { background:#27ae60; }
 
-  /* Сообщение об успешной/ошибочной синхронизации */
+  .topbar {
+    text-align:center;
+    margin:10px 0 20px 0;
+  }
+
   .alert {
     text-align:center;
     padding:10px;
@@ -92,7 +96,12 @@ function openTab(tabId) {
 
 <div class="card" style="width:90%;max-width:1100px;margin:auto;">
   <h2 style="text-align:center;">👑 Админ-панель EduKaz</h2>
-  <div class="status" style="text-align:center;margin-bottom:10px;"><?= $db_status ?></div>
+
+  <!-- Верхняя панель -->
+  <div class="topbar">
+    <a href="index.php" class="btn btn-success">🏠 На главную</a>
+    <a href="logout.php" class="btn btn-danger">🚪 Выйти</a>
+  </div>
 
   <div class="tabs">
     <a href="#" class="tab-btn" onclick="openTab('users')">👤 Пользователи</a>
@@ -154,7 +163,6 @@ function openTab(tabId) {
     </div>
     <div style="text-align:center;margin-top:15px;">
       <a href="scheduler_sync.php" class="btn">🔄 Запустить синхронизацию сейчас</a>
-      <a href="index.php" class="btn btn-danger">⬅ На главную</a>
     </div>
   </div>
 </div>
