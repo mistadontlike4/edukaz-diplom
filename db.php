@@ -39,16 +39,10 @@ try {
     $host = "localhost";
     $port = "5432";
     $user = "postgres";
-    $pass = "12345"; // ← поставь свой пароль от локальной PostgreSQL
-    $name = "edukaz";
+    $pass = "admin"; // ← поставь свой пароль от локальной PostgreSQL
+    $name = "edukaz_backup";
 
     $conn = @pg_connect("host=$host port=$port dbname=$name user=$user password=$pass");
 }
 
-// 3️⃣ Проверка соединения
-if (!$conn) {
-    echo "<p style='color:red;'>❌ Ошибка подключения к базе данных.</p>";
-} else {
-    echo "<p style='color:green;'>✅ Подключено к " . ($is_local ? "локальной базе данных" : "Railway PostgreSQL") . "</p>";
-}
-?>
+
