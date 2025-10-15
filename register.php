@@ -12,10 +12,7 @@ $message = "";
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
     // Проверка CSRF токена
-    if (
-        !isset($_POST['csrf_token']) ||
-        $_POST['csrf_token'] !== $_SESSION['csrf_token']
-    ) {
+    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
         die("CSRF token mismatch");
     }
 
@@ -49,7 +46,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             // Вставка нового пользователя
             $insert = pg_query_params(
                 $conn,
-                "INSERT INTO users (username, email, password, role, created_at) VALUES ($1, $2, $3, 'user', NOW())",
+                "INSERT INTO users (username, email, password, role, created_at) VALUES ($1, $2, $3, 'user', now())",
                 [$u, $e, $p]
             );
 
@@ -70,27 +67,62 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
   <title>Регистрация</title>
   <link rel="stylesheet" href="style.css">
   <style>
-    /* Небольшие стили для ошибки */
     .error { color: #b00020; background:#ffecec; padding:10px; border-radius:6px; margin-bottom:10px; }
     .form-row { margin-bottom:12px; }
-    input[type="text"], input[type="email"], input[type="password"] { width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box; }
-    .btn { display:inline-block; padding:8px 14px; border-radius:6px; background:#0d6efd; color:#fff; text-decoration:none; border:none; cursor:pointer; }
-    .btn-success { background:#0d6efd; }
   </style>
-  <script>
-    // Клиентская проверка: пароль и подтверждение
-    function validateForm(event) {
-      var p = document.getElementById('password').value;
-      var pc = document.getElementById('password_confirm').value;
-      var errBox = document.getElementById('client_error');
-      if (p !== pc) {
-        errBox.textContent = 'ваши пароли не одинаковые';
-        errBox.style.display = 'block';
-        event.preventDefault();
-        return false;
-      }
-      errBox.style.display = 'none';
-      return true;
-    }
+</head>
+<body>
+<div class="card" style="max-width:600px; margin:40px auto;">
+  <h2>🧾 Регистрация</h2>
 
-    // У
+  <?php if ($message): ?>
+    <div class="error"><?= htmlspecialchars($message) ?></div>
+  <?php endif; ?>
+
+  <form id="registerForm" method="post" onsubmit="return checkPasswords();">
+    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
+
+    <div class="form-row">
+      <input type="text" name="username" placeholder="Логин" required style="width:100%; padding:10px; box-sizing:border-box;">
+    </div>
+
+    <div class="form-row">
+      <input type="email" name="email" placeholder="Email" required style="width:100%; padding:10px; box-sizing:border-box;">
+    </div>
+
+    <div class="form-row">
+      <input id="password" type="password" name="password" placeholder="Пароль" required style="width:100%; padding:10px; box-sizing:border-box;">
+    </div>
+
+    <div class="form-row">
+      <input id="password_confirm" type="password" name="password_confirm" placeholder="Подтвердите пароль" required style="width:100%; padding:10px; box-sizing:border-box;">
+    </div>
+
+    <div id="clientError" class="error" style="display:none;"></div>
+
+    <button type="submit" class="btn btn-success" style="padding:10px 18px;">Зарегистрироваться</button>
+  </form>
+
+  <div class="nav" style="margin-top:12px;">
+    Уже есть аккаунт?
+    <a class="btn" href="login.php" style="display:inline-block; margin-left:8px;">Войти</a>
+  </div>
+</div>
+
+<script>
+function checkPasswords() {
+  const pass = document.getElementById('password').value;
+  const conf = document.getElementById('password_confirm').value;
+  const clientErr = document.getElementById('clientError');
+
+  if (pass !== conf) {
+    clientErr.textContent = "ваши пароли не одинаковые";
+    clientErr.style.display = 'block';
+    return false; // блокируем отправку формы
+  }
+  clientErr.style.display = 'none';
+  return true;
+}
+</script>
+</body>
+</html>
