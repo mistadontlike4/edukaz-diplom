@@ -9,15 +9,16 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
 }
 
 $admin_id = (int)$_SESSION['user_id'];
-// CSRF
+
+/* ---------- CSRF ---------- */
 if (empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(32));
 $csrf = $_SESSION['csrf'];
 
 $msg = "";
 
 /* ---------- HANDLERS ---------- */
-// create user
-if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['action']) && $_POST['action']==='create_user') {
+// Создать пользователя
+if ($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['action'] ?? '')==='create_user') {
   if (!hash_equals($_SESSION['csrf'], $_POST['csrf'] ?? '')) { die("CSRF mismatch"); }
 
   $u = trim($_POST['username'] ?? '');
@@ -28,8 +29,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['action']) && $_POST['ac
   if ($u==='' || $e==='' || $p==='') {
     $msg = "<div class='alert bad'>Заполните все поля.</div>";
   } else {
-    // уникальность
-    $dup = pg_query_params($conn, "SELECT 1 FROM users WHERE username=$1 OR email=$2", [$u, $e]);
+    $dup = pg_query_params($conn, "SELECT 1 FROM users WHERE username=$1 OR email=$2", [$u,$e]);
     if ($dup && pg_fetch_row($dup)) {
       $msg = "<div class='alert bad'>Логин или email уже заняты.</div>";
     } else {
@@ -38,23 +38,24 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['action']) && $_POST['ac
         "INSERT INTO users(username,email,password,role) VALUES($1,$2,$3,$4)",
         [$u,$e,$hash,$r]
       );
-      $msg = $ok ? "<div class='alert ok'>Пользователь создан.</div>" :
-                   "<div class='alert bad'>Ошибка создания: ".htmlspecialchars(pg_last_error($conn))."</div>";
+      $msg = $ok ? "<div class='alert ok'>Пользователь создан.</div>"
+                 : "<div class='alert bad'>Ошибка создания: ".htmlspecialchars(pg_last_error($conn))."</div>";
     }
   }
 }
 
-// delete user
-if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['action']) && $_POST['action']==='delete_user') {
+// Удалить пользователя
+if ($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['action'] ?? '')==='delete_user') {
   if (!hash_equals($_SESSION['csrf'], $_POST['csrf'] ?? '')) { die("CSRF mismatch"); }
   $uid = (int)($_POST['user_id'] ?? 0);
   if ($uid === $admin_id) {
     $msg = "<div class='alert bad'>Нельзя удалить самого себя.</div>";
   } else {
-    // попробуем удалить; если у тебя FK на files(uploaded_by) ON DELETE CASCADE — файлы удалятся сами
+    // Если нет FK ON DELETE CASCADE — сначала удалите файлы пользователя:
+    // pg_query_params($conn, "DELETE FROM files WHERE uploaded_by=$1", [$uid]);
     $ok = pg_query_params($conn, "DELETE FROM users WHERE id=$1", [$uid]);
-    $msg = $ok ? "<div class='alert ok'>Пользователь удалён.</div>" :
-                 "<div class='alert bad'>Ошибка удаления: ".htmlspecialchars(pg_last_error($conn))."</div>";
+    $msg = $ok ? "<div class='alert ok'>Пользователь удалён.</div>"
+               : "<div class='alert bad'>Ошибка удаления: ".htmlspecialchars(pg_last_error($conn))."</div>";
   }
 }
 
@@ -92,7 +93,7 @@ function dt($ts){ return $ts ? date('Y-m-d H:i', strtotime($ts)) : '—'; }
   <style>
     body{font-family:Arial;background:#f6f7fb}
     .topbar{display:flex;gap:8px;justify-content:center;margin:8px 0 14px}
-    .btn{padding:8px 14px;border-radius:8px;background:#007bff;color:#fff;text-decoration:none}
+    .btn{padding:8px 14px;border-radius:8px;background:#007bff;color:#fff;text-decoration:none;cursor:pointer;border:none}
     .btn:hover{background:#0056b3}
     .btn-danger{background:#e74c3c}.btn-danger:hover{background:#c0392b}
     .tabs{text-align:center;margin-bottom:14px}
@@ -104,7 +105,7 @@ function dt($ts){ return $ts ? date('Y-m-d H:i', strtotime($ts)) : '—'; }
     th,td{border:1px solid #ddd;padding:8px;text-align:center}
     .status-box{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:10px 0}
     .status-item{background:#fff;padding:12px 18px;border-radius:10px;box-shadow:0 2px 5px rgba(0,0,0,.08);min-width:220px;text-align:center}
-    .log{background:#111;color:#eee;font-family:monospace;padding:10px;border-radius:8px;max-height:300px;overflow:auto}
+    .log{background:#111;color:#eee;font-family:monospace;padding:10px;border-radius:8px;max-height:300px;overflow:auto;white-space:pre-wrap}
     .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
     .alert{margin:8px 0;padding:10px;border-radius:8px}
     .ok{background:#eaf8ee;color:#157347}.bad{background:#fdecea;color:#b02a37}
@@ -120,6 +121,28 @@ function dt($ts){ return $ts ? date('Y-m-d H:i', strtotime($ts)) : '—'; }
         f.user_id.value = uid; f.submit();
       }
       return false;
+    }
+    async function runSync(mode){
+      const statusEl = document.getElementById('syncStatus');
+      const logEl = document.getElementById('syncLog');
+      statusEl.style.display = 'block';
+      statusEl.innerHTML = "⏳ Выполняю синхронизацию ("+mode+")…";
+      logEl.textContent = "Идёт выполнение…";
+
+      try {
+        const resp = await fetch('sync.php?mode=' + encodeURIComponent(mode), {cache:'no-store'});
+        const text = await resp.text();
+        statusEl.innerHTML = text.includes('✅') ?
+          "✅ Синхронизация завершена ("+mode+")." :
+          "⚠️ Ответ: " + text.replace(/</g,'&lt;');
+
+        const logResp = await fetch('log_view.php?n=200&ts=' + Date.now(), {cache:'no-store'});
+        const logText = await logResp.text();
+        logEl.textContent = logText || 'Лог пуст.';
+        logEl.scrollTop = logEl.scrollHeight;
+      } catch (e) {
+        statusEl.innerHTML = "❌ Ошибка запроса: " + (e.message || e);
+      }
     }
   </script>
 </head>
@@ -146,7 +169,7 @@ function dt($ts){ return $ts ? date('Y-m-d H:i', strtotime($ts)) : '—'; }
   <div class="tabs">
     <a class="tab-btn" href="#" onclick="openTab('users')">👤 Пользователи</a>
     <a class="tab-btn" href="#" onclick="openTab('files')">📂 Файлы</a>
-    <a class="tab-btn" href="#" onclick="openTab('monitor')">🖥 Мониторинг</a>
+    <a class="tab-btn" href="#" onclick="openTab('monitor')">🖥 Мониторинг системы</a>
   </div>
 
   <!-- USERS -->
@@ -223,20 +246,23 @@ function dt($ts){ return $ts ? date('Y-m-d H:i', strtotime($ts)) : '—'; }
 
   <!-- MONITOR -->
   <div id="monitor" class="tab-content">
-    <h3>🖥 Мониторинг</h3>
-    <p>Последние 20 записей синхронизации:</p>
-    <div class="log">
-      <?php
-        if (empty($log_content)) echo "<div>Лог пуст.</div>";
-        else foreach (array_reverse(array_slice($log_content, -20)) as $line) {
-          echo "<div>".htmlspecialchars($line)."</div>";
-        }
-      ?>
+    <h3>🖥 Мониторинг системы</h3>
+
+    <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:10px;">
+      <button class="btn" onclick="runSync('both')">🔄 Синхронизация (оба направления)</button>
+      <button class="btn" onclick="runSync('pull')">⬇ Получить с Railway → локальная</button>
+      <button class="btn" onclick="runSync('push')">⬆ Отправить локальная → Railway</button>
     </div>
-    <div style="text-align:center;margin-top:12px;">
-      <a class="btn" href="scheduler_sync.php">🔄 Синхронизация сейчас</a>
-      <a class="btn" href="index.php">⬅ На главную</a>
-      <a class="btn btn-danger" href="logout.php">🚪 Выйти</a>
+
+    <div id="syncStatus" style="text-align:center;margin:8px 0;display:none;"></div>
+
+    <div class="log" id="syncLog" style="min-height:120px;">
+      <div>Здесь появится лог после запуска синхронизации…</div>
+    </div>
+
+    <div style="text-align:center;margin-top:14px;">
+      <a href="index.php" class="btn">⬅ На главную</a>
+      <a href="logout.php" class="btn btn-danger">🚪 Выйти</a>
     </div>
   </div>
 
