@@ -19,6 +19,15 @@ $logFile = __DIR__ . '/sync_log.txt';
 function logmsg($m){ global $logFile; file_put_contents($logFile, "[".date("Y-m-d H:i:s")."] $m\n", FILE_APPEND); }
 function escv($v){ return $v===null ? 'NULL' : "'".pg_escape_string($v)."'"; }
 
+// Ловим ошибки подключения без использования pg_last_error() на null
+function pg_try_connect(string $conn_str, ?string &$err = null) {
+  $err = null;
+  set_error_handler(function($errno, $errstr) use (&$err){ $err = $errstr; });
+  $c = @pg_connect($conn_str);
+  restore_error_handler();
+  return $c;
+}
+
 // ---- Параметр режима ----
 $mode = isset($_GET['mode']) ? strtolower(trim($_GET['mode'])) : 'both';
 if (!in_array($mode, ['pull','push','both'], true)) $mode = 'both';
@@ -44,11 +53,26 @@ $local = [
 
 logmsg("🚀 Старт синхронизации (mode=$mode)");
 
-$remote_conn = @pg_connect("host={$remote['host']} port={$remote['port']} dbname={$remote['dbname']} user={$remote['user']} password={$remote['password']}");
-$local_conn  = @pg_connect("host={$local['host']}  port={$local['port']}  dbname={$local['dbname']}  user={$local['user']}  password={$local['password']}");
+// Добавим connect_timeout, чтобы быстро падать, а не висеть
+$remote_str = "host={$remote['host']} port={$remote['port']} dbname={$remote['dbname']} user={$remote['user']} password={$remote['password']} connect_timeout=5";
+$local_str  = "host={$local['host']}  port={$local['port']}  dbname={$local['dbname']}  user={$local['user']}  password={$local['password']}  connect_timeout=5";
 
-if (!$remote_conn) { $e = pg_last_error() ?: 'нет деталей'; logmsg("❌ Railway недоступен: $e");  exit("❌ Railway недоступен: ".htmlspecialchars($e)); }
-if (!$local_conn)  { $e = pg_last_error() ?: 'нет деталей'; logmsg("❌ Локальная БД недоступна: $e"); exit("❌ Локальная БД недоступна: ".htmlspecialchars($e)); }
+// Пробуем подключиться и собираем понятные ошибки
+$remote_err = $local_err = null;
+$remote_conn = pg_try_connect($remote_str, $remote_err);
+$local_conn  = pg_try_connect($local_str, $local_err);
+
+// Чёткие сообщения (без deprecated):
+if (!$remote_conn) {
+  $meta = "host={$remote['host']} port={$remote['port']} db={$remote['dbname']} user={$remote['user']}";
+  logmsg("❌ Railway недоступен ($meta): ".($remote_err ?: 'нет деталей'));
+  exit("❌ Railway недоступен: ".htmlspecialchars($remote_err ?: 'нет деталей')."<br>($meta)");
+}
+if (!$local_conn) {
+  $meta = "host={$local['host']} port={$local['port']} db={$local['dbname']} user={$local['user']}";
+  logmsg("❌ Локальная БД недоступна ($meta): ".($local_err ?: 'нет деталей'));
+  exit("❌ Локальная БД недоступна: ".htmlspecialchars($local_err ?: 'нет деталей')."<br>($meta)");
+}
 
 // ---- Схема/миграции (минимум, чтобы не падать) ----
 $schema_sql = [
