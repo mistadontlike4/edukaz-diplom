@@ -1,110 +1,109 @@
 <?php
-// Админ-панель (сокращённая версия с упором на Мониторинг)
 session_start();
-require_once "db.php"; // должен устанавливать $conn (Railway/локально) и, желательно, role в сессии
+require_once "db.php";
 
 if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'admin') {
   header("Location: login.php"); exit;
 }
 
-// Статистика
+// детектор Railway (чтобы скрыть кнопки синка на проде)
+$on_railway = isset($_ENV['RAILWAY_ENVIRONMENT'])
+           || isset($_SERVER['RAILWAY_ENVIRONMENT'])
+           || (isset($_SERVER['HTTP_HOST']) && str_contains($_SERVER['HTTP_HOST'], 'railway.app'));
+
+// простая статистика
 $users_total = 0; $files_total = 0; $last_file_at = '-';
 if ($conn) {
-  $r = pg_query($conn,"SELECT COUNT(*) FROM users"); if ($r) $users_total = (int)pg_fetch_result($r,0,0);
-  $r = pg_query($conn,"SELECT COUNT(*) FROM files"); if ($r) $files_total = (int)pg_fetch_result($r,0,0);
-  $r = pg_query($conn,"SELECT to_char(MAX(uploaded_at),'YYYY-MM-DD HH24:MI') FROM files");
-  if ($r) $last_file_at = pg_fetch_result($r,0,0) ?: '-';
+  if ($r = pg_query($conn, "SELECT COUNT(*) FROM users")) $users_total = (int)pg_fetch_result($r,0,0);
+  if ($r = pg_query($conn, "SELECT COUNT(*) FROM files")) $files_total = (int)pg_fetch_result($r,0,0);
+  if ($r = pg_query($conn, "SELECT to_char(MAX(uploaded_at),'YYYY-MM-DD HH24:MI') FROM files"))
+      $last_file_at = pg_fetch_result($r,0,0) ?: '-';
 }
 
-// Мониторинг: прогон синка по кнопкам
+// запуск синка (plain) по кнопкам
 $sync_response = null;
 if (isset($_GET['action']) && $_GET['action']==='sync') {
   $mode = $_GET['mode'] ?? 'both';
-  if (!in_array($mode,['pull','push','both'],true)) $mode='both';
+  if (!in_array($mode, ['pull','push','both'], true)) $mode = 'both';
 
-  // вызывать по HTTP, чтобы гарантированно исполнился PHP
+  // обращаемся к sync.php по HTTP, чтобы гарантированно исполнился PHP
   $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS']!=='off') ? 'https' : 'http';
   $base   = rtrim(dirname($_SERVER['SCRIPT_NAME']),'/\\');
   $url    = $scheme.'://'.$_SERVER['HTTP_HOST'].$base.'/sync.php?mode='.$mode.'&plain=1';
 
   $ctx = stream_context_create(['http'=>['timeout'=>120]]);
-  $sync_response = @file_get_contents($url,false,$ctx);
-  if ($sync_response===false) $sync_response = "❌ Не удалось обратиться к $url";
+  $sync_response = @file_get_contents($url, false, $ctx);
+  if ($sync_response === false) $sync_response = "❌ Не удалось обратиться к $url";
 }
 
-// Логи
-$logfile = __DIR__."/sync_log.txt";
-$log_text = file_exists($logfile) ? file($logfile, FILE_IGNORE_NEW_LINES) : [];
+// читаем хвост логов
+$logfile = __DIR__ . "/sync_log.txt";
+$log_text = file_exists($logfile) ? file($logfile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) : [];
 $tail = implode("\n", array_slice($log_text, -300));
 ?>
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<title>Админ-панель — Мониторинг</title>
-<link rel="stylesheet" href="style.css">
-<style>
-  body{font-family:Inter,Arial,sans-serif;background:#f6f7fb;margin:0}
-  .wrap{max-width:1100px;margin:26px auto;padding:0 12px}
-  .row{display:flex;gap:14px;flex-wrap:wrap}
-  .card{background:#fff;border-radius:14px;box-shadow:0 4px 14px rgba(0,0,0,.06);padding:16px 18px}
-  .pill{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:12px;background:#fff;box-shadow:0 4px 12px rgba(0,0,0,.06);min-width:240px}
-  .btn{display:inline-block;padding:10px 14px;border-radius:10px;background:#1677ff;color:#fff;text-decoration:none}
-  .btn:hover{background:#0d62d6}
-  .btn.red{background:#e74c3c}
-  .btn.gray{background:#eef1f7;color:#111}
-  .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 8px}
-  pre.log{background:#111;color:#cde; padding:12px;border-radius:10px;max-height:420px;overflow:auto;font:12.5px/1.45 Consolas,Monaco,monospace}
-  .stat{display:flex;gap:10px;align-items:center}
-  .dot{width:10px;height:10px;border-radius:50%;}
-  .dot.green{background:#2ecc71}
-  .dot.red{background:#e74c3c}
-</style>
+  <meta charset="UTF-8">
+  <title>Админ-панель — Мониторинг</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .toolbar { display:flex; gap:10px; flex-wrap:wrap; margin:10px 0; }
+    .pill { display:inline-block; padding:10px 14px; background:#fff; border-radius:10px; box-shadow:0 4px 12px rgba(0,0,0,.06); margin-right:10px; }
+    pre.log { background:#111; color:#cde; border-radius:10px; padding:12px; max-height:420px; overflow:auto; font:12.5px/1.45 Consolas,Monaco,monospace; }
+    .note { background:#fff7e6; border:1px solid #ffd591; color:#8a6d3b; padding:10px 12px; border-radius:8px; }
+    .btn.disabled { pointer-events:none; opacity:.6; }
+    .header-actions { display:flex; gap:8px; }
+  </style>
 </head>
 <body>
-<div class="wrap">
+<div class="card" style="max-width:1100px;margin:20px auto;">
 
-  <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px">
-    <div class="stat">
-      <span class="dot green"></span>
-      <b>Railway PostgreSQL подключён</b>
+  <div class="header-actions" style="justify-content:space-between; align-items:center;">
+    <div>
+      <span class="pill">Активная БД: <b><?= $on_railway ? 'Railway' : 'Локальная' ?></b></span>
+      <span class="pill">Пользователи: <b><?= (int)$users_total ?></b></span>
+      <span class="pill">Файлы: <b><?= (int)$files_total ?></b></span>
+      <span class="pill">Последний файл: <b><?= htmlspecialchars($last_file_at) ?></b></span>
     </div>
-    <div class="row">
-      <a class="btn gray" href="index.php">⬅ На главную</a>
-      <a class="btn red" href="logout.php">🚪 Выйти</a>
+    <div class="header-actions">
+      <a href="index.php" class="btn">⬅ На главную</a>
+      <a href="logout.php" class="btn btn-danger">🚪 Выйти</a>
     </div>
   </div>
 
-  <div class="row">
-    <div class="pill">Активная БД&nbsp;&nbsp; <b>Railway</b></div>
-    <div class="pill">Пользователи&nbsp;&nbsp; <b><?= (int)$users_total ?></b></div>
-    <div class="pill">Файлы&nbsp;&nbsp; <b><?= (int)$files_total ?></b></div>
-    <div class="pill">Последний файл&nbsp;&nbsp; <b><?= htmlspecialchars($last_file_at) ?></b></div>
-  </div>
+  <h2 style="margin-top:10px;">🖥 Мониторинг системы</h2>
 
-  <div class="card" style="margin-top:18px">
-    <h3>🖥 Мониторинг системы</h3>
-
-    <div class="toolbar">
+  <div class="toolbar">
+    <?php if ($on_railway): ?>
+      <a class="btn disabled">🔁 Синхронизация (оба направления)</a>
+      <a class="btn disabled">⬇ Получить с Railway → локальная</a>
+      <a class="btn disabled">⬆ Отправить локальная → Railway</a>
+    <?php else: ?>
       <a class="btn" href="?action=sync&mode=both">🔁 Синхронизация (оба направления)</a>
       <a class="btn" href="?action=sync&mode=pull">⬇ Получить с Railway → локальная</a>
       <a class="btn" href="?action=sync&mode=push">⬆ Отправить локальная → Railway</a>
-    </div>
-
-    <?php if ($sync_response !== null): ?>
-      <div class="card" style="background:#fff7e6;border:1px solid #ffd591;margin:10px 0">
-        <div style="color:#8c6d1f;font:14px/1.4 Arial">
-          <b>⚠ Ответ:</b> <?= htmlspecialchars($sync_response, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>
-        </div>
-      </div>
     <?php endif; ?>
+  </div>
 
-    <pre class="log"><?= htmlspecialchars($tail, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></pre>
-
-    <div class="toolbar" style="justify-content:space-between">
-      <a class="btn gray" href="index.php">⬅ На главную</a>
-      <a class="btn red" href="logout.php">🚪 Выйти</a>
+  <?php if ($on_railway): ?>
+    <div class="note" style="margin-bottom:10px;">
+      ⚠ Эти операции выполняются <b>только с локального сайта</b> (http://localhost/edukaz/admin.php).
+      Контейнер Railway не может подключаться к вашей локальной PostgreSQL.
     </div>
+  <?php endif; ?>
+
+  <?php if ($sync_response !== null): ?>
+    <div class="note" style="margin-bottom:10px;">
+      <b>Ответ:</b> <?= htmlspecialchars($sync_response, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>
+    </div>
+  <?php endif; ?>
+
+  <pre class="log"><?= htmlspecialchars($tail, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></pre>
+
+  <div class="toolbar" style="justify-content:space-between;">
+    <a href="index.php" class="btn">⬅ На главную</a>
+    <a href="logout.php" class="btn btn-danger">🚪 Выйти</a>
   </div>
 
 </div>
