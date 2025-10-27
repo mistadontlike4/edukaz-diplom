@@ -2,9 +2,9 @@
 /**
  * sync.php — двунаправленная синхронизация Local <-> Railway
  * Режимы:
- *   - ?mode=pull  : Railway → Local
- *   - ?mode=push  : Local → Railway
- *   - ?mode=both  : (по умолчанию) сначала pull, затем push
+ *   ?mode=pull  : Railway → Local
+ *   ?mode=push  : Local → Railway
+ *   ?mode=both  : (по умолчанию) сначала pull, затем push
  *
  * Логи: sync_log.txt (в корне проекта)
  */
@@ -12,14 +12,12 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 date_default_timezone_set('Asia/Almaty');
-
 header('Content-Type: text/html; charset=utf-8');
 
 $logFile = __DIR__ . '/sync_log.txt';
 function logmsg($m){ global $logFile; file_put_contents($logFile, "[".date("Y-m-d H:i:s")."] $m\n", FILE_APPEND); }
-function escv($v){ return $v===null ? 'NULL' : "'".pg_escape_string($v)."'"; }
 
-// Ловим ошибки подключения без использования pg_last_error() на null
+// ловим текст ошибки подключения, не дергая pg_last_error(null)
 function pg_try_connect(string $conn_str, ?string &$err = null) {
   $err = null;
   set_error_handler(function($errno, $errstr) use (&$err){ $err = $errstr; });
@@ -28,13 +26,12 @@ function pg_try_connect(string $conn_str, ?string &$err = null) {
   return $c;
 }
 
-// ---- Параметр режима ----
+// ---- режим ----
 $mode = isset($_GET['mode']) ? strtolower(trim($_GET['mode'])) : 'both';
 if (!in_array($mode, ['pull','push','both'], true)) $mode = 'both';
 
-// ---- Подключения ----
-// Railway (REMOTE)
-$remote = [
+// ---- подключения ----
+$remote = [ // Railway
   'host' => 'interchange.proxy.rlwy.net',
   'port' => '54049',
   'dbname' => 'railway',
@@ -42,8 +39,7 @@ $remote = [
   'password' => 'USLLNRHbFMSNNdOUnAxkbHxbkfpsmQGu',
 ];
 
-// Local (LOCAL) — пароль admin
-$local = [
+$local = [ // локальная — пароль admin
   'host' => 'localhost',
   'port' => '5432',
   'dbname' => 'edukaz_backup',
@@ -53,16 +49,13 @@ $local = [
 
 logmsg("🚀 Старт синхронизации (mode=$mode)");
 
-// Добавим connect_timeout, чтобы быстро падать, а не висеть
 $remote_str = "host={$remote['host']} port={$remote['port']} dbname={$remote['dbname']} user={$remote['user']} password={$remote['password']} connect_timeout=5";
 $local_str  = "host={$local['host']}  port={$local['port']}  dbname={$local['dbname']}  user={$local['user']}  password={$local['password']}  connect_timeout=5";
 
-// Пробуем подключиться и собираем понятные ошибки
 $remote_err = $local_err = null;
 $remote_conn = pg_try_connect($remote_str, $remote_err);
-$local_conn  = pg_try_connect($local_str, $local_err);
+$local_conn  = pg_try_connect($local_str,  $local_err);
 
-// Чёткие сообщения (без deprecated):
 if (!$remote_conn) {
   $meta = "host={$remote['host']} port={$remote['port']} db={$remote['dbname']} user={$remote['user']}";
   logmsg("❌ Railway недоступен ($meta): ".($remote_err ?: 'нет деталей'));
@@ -74,7 +67,7 @@ if (!$local_conn) {
   exit("❌ Локальная БД недоступна: ".htmlspecialchars($local_err ?: 'нет деталей')."<br>($meta)");
 }
 
-// ---- Схема/миграции (минимум, чтобы не падать) ----
+// ---- схема / миграции (на обеих БД) ----
 $schema_sql = [
   // users
   "CREATE TABLE IF NOT EXISTS users (
@@ -102,12 +95,11 @@ $schema_sql = [
   "ALTER TABLE files ADD COLUMN IF NOT EXISTS size BIGINT DEFAULT 0;",
   "ALTER TABLE files ADD COLUMN IF NOT EXISTS downloads INTEGER DEFAULT 0;"
 ];
-
 foreach ([$local_conn,$remote_conn] as $cx) {
   foreach ($schema_sql as $sql) { @pg_query($cx, $sql); }
 }
 
-// ---- Гарантируем корректные FK (безопасно если уже есть) ----
+// ---- гарантируем FK (безопасно, если уже есть) ----
 $fk_sql = [
   "ALTER TABLE files
      DROP CONSTRAINT IF EXISTS files_uploaded_by_fkey,
@@ -122,22 +114,27 @@ foreach ([$local_conn,$remote_conn] as $cx) {
   foreach ($fk_sql as $sql) { @pg_query($cx, $sql); }
 }
 
+// ---- утилиты ----
 function has_column($conn,$table,$col){
   $q="SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=$1 AND column_name=$2";
   $r=pg_query_params($conn,$q,[$table,$col]); return $r && pg_fetch_row($r);
 }
 function user_map($conn){
-  $m=[]; $r=pg_query($conn,"SELECT id,username FROM users");
+  $m=[]; $r=pg_query($conn,"SELECT id, username FROM users");
   if ($r) while($x=pg_fetch_assoc($r)) $m[$x['username']]=(int)$x['id'];
   return $m;
 }
-function upsert_user_from_row($dst_conn,$row){
+function upsert_user_from_row($dst_conn, array $row){
   $ex = pg_query_params($dst_conn,"SELECT id FROM users WHERE username=$1 OR email=$2",[$row['username'],$row['email']]);
   if ($ex && ($e=pg_fetch_assoc($ex))) return (int)$e['id'];
   $q="INSERT INTO users(username,email,password,role,created_at)
       VALUES($1,$2,$3,$4,COALESCE($5,NOW())) RETURNING id";
   $r=pg_query_params($dst_conn,$q,[
-    $row['username'],$row['email'],$row['password'],$row['role']?:'user',$row['created_at']
+    $row['username'],
+    $row['email'],
+    $row['password'],
+    $row['role'] ?: 'user',
+    $row['created_at']
   ]);
   if ($r && ($x=pg_fetch_assoc($r))) return (int)$x['id'];
   return null;
@@ -148,35 +145,31 @@ function file_exists_by_natural_key($conn,$original_name,$uploader_id,$uploaded_
   else { $q.="uploaded_at=$4"; $p=[$original_name,$uploader_id,(int)$size,$uploaded_at]; }
   $r=pg_query_params($conn,$q,$p); return ($r && pg_fetch_row($r));
 }
-function insert_file_if_missing($dst_conn,$row,$uploader_id,$shared_with_id,$has_file_data_col){
+function insert_file_if_missing($dst_conn, array $row, int $uploader_id, ?int $shared_with_id, bool $has_file_data_col){
   $orig = $row['original_name'];
   $up_at = $row['uploaded_at'];
   $size  = $row['size']!==null ? (int)$row['size'] : 0;
 
   if (file_exists_by_natural_key($dst_conn,$orig,$uploader_id,$up_at,$size)) return true;
 
-  $cols = ['filename','original_name','uploaded_by','size','downloads','access_type','shared_with','uploaded_at'];
-  $vals = [
-    escv($row['filename']),
-    escv($row['original_name']),
+  // параметризованный INSERT
+  $sql = "INSERT INTO files
+          (filename, original_name, uploaded_by, size, downloads, access_type, shared_with, uploaded_at)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)";
+  $params = [
+    $row['filename'],
+    $row['original_name'],
     $uploader_id,
     (int)$size,
     (int)($row['downloads'] ?? 0),
-    escv($row['access_type'] ?? 'public'),
-    ($shared_with_id===null ? 'NULL' : (int)$shared_with_id),
-    ($up_at===null ? 'NULL' : escv($up_at))
+    ($row['access_type'] ?? 'public'),
+    $shared_with_id,   // может быть null
+    $up_at             // может быть null
   ];
-
-  // бинарь file_data по умолчанию не копируем (можно включить при необходимости):
-  // if ($has_file_data_col && array_key_exists('file_data',$row) && $row['file_data']!==null) {
-  //   $cols[]='file_data'; $vals[]=escv($row['file_data']);
-  // }
-
-  $sql="INSERT INTO files (".implode(',',$cols).") VALUES (".implode(',',$vals).")";
-  return (bool)pg_query($dst_conn,$sql);
+  return (bool)pg_query_params($dst_conn, $sql, $params);
 }
 
-// ---- Направления ----
+// ---- направления ----
 function pull_remote_to_local($remote_conn,$local_conn){
   logmsg("⬇️ PULL: Railway → Local");
 
@@ -245,7 +238,7 @@ function push_local_to_remote($local_conn,$remote_conn){
   logmsg("PUSH files: добавлено = $ins");
 }
 
-// ---- Запуск ----
+// ---- запуск ----
 try {
   if ($mode==='pull') {
     pull_remote_to_local($remote_conn,$local_conn);
