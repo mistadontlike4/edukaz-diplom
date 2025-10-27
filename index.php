@@ -1,109 +1,80 @@
 <?php
 include("db.php");
 session_start();
+date_default_timezone_set('Asia/Almaty');
 
 if (!isset($_SESSION['user_id'])) {
-    header("Location: login.php");
-    exit;
+  header("Location: login.php");
+  exit;
 }
 
-$user_id = $_SESSION['user_id'];
-$role = $_SESSION['role'] ?? null;
+$user_id = (int)$_SESSION['user_id'];
+$role    = $_SESSION['role'] ?? 'user';
 
-// Получаем список файлов (пример — под PostgreSQL)
-$query = "
-    SELECT f.*, u.username AS uploader, u2.username AS shared_user
-    FROM files f
-    JOIN users u ON f.uploaded_by = u.id
-    LEFT JOIN users u2 ON f.shared_with = u2.id
-    WHERE 
-        f.access_type = 'public'
-        OR (f.access_type = 'private' AND f.uploaded_by = $1)
-        OR (f.access_type = 'user' AND (f.shared_with = $1 OR f.uploaded_by = $1))
-    ORDER BY f.id DESC
+// список файлов доступных пользователю
+$sql = "
+  SELECT f.id, f.filename, f.original_name, f.size, f.uploaded_by, f.access_type, f.shared_with, f.uploaded_at,
+         u.username AS uploader, u2.username AS shared_user
+  FROM files f
+  JOIN users u ON f.uploaded_by = u.id
+  LEFT JOIN users u2 ON f.shared_with = u2.id
+  WHERE
+      f.access_type = 'public'
+   OR (f.access_type = 'private' AND f.uploaded_by = $user_id)
+   OR (f.access_type = 'user' AND (f.shared_with = $user_id OR f.uploaded_by = $user_id))
+  ORDER BY f.uploaded_at DESC NULLS LAST, f.id DESC
 ";
-$result = pg_query_params($conn, $query, [$user_id]);
+$result = pg_query($conn, $sql);
+
+function dt($ts) { return $ts ? date('Y-m-d H:i', strtotime($ts)) : '—'; }
 ?>
 <!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>EduKaz — Файлы</title>
+  <title>Файлы — EduKaz</title>
   <link rel="stylesheet" href="style.css">
-  <style>
-    .status-bar {
-      text-align: center;
-      margin: 10px auto;
-      padding: 8px;
-      border-radius: 10px;
-      background: #f8f8f8;
-      width: fit-content;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-      font-family: Arial;
-      font-size: 14px;
-    }
-    .file-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 15px;
-    }
-    .file-table th, .file-table td {
-      border: 1px solid #ccc;
-      padding: 8px;
-      text-align: center;
-    }
-    .footer-buttons {
-      text-align: center;
-      margin-top: 20px;
-    }
-    .btn { text-decoration: none; padding: 6px 12px; border-radius: 5px; background: #007bff; color: white; }
-    .btn:hover { background: #0056b3; }
-    .btn-danger { background: #e74c3c; }
-    .btn-danger:hover { background: #c0392b; }
-    .btn-success { background: #2ecc71; }
-    .btn-success:hover { background: #27ae60; }
-  </style>
 </head>
 <body>
+<div class="card" style="max-width:1000px; width:94%; margin:auto;">
+  <h2 style="text-align:center;">📂 Список файлов</h2>
+  <div style="text-align:center;margin:6px 0;"><?= $db_status ?></div>
 
-<div class="card">
-  <h2>📂 Список файлов</h2>
-
-  <div class="status-bar"><?= $db_status ?></div>
-
-  <table class="file-table">
+  <table>
     <tr>
       <th>Имя</th>
       <th>Загрузил</th>
       <th>Размер</th>
+      <th>Добавлен</th>
       <th>Доступ</th>
       <th>Действия</th>
     </tr>
-    <?php while ($row = pg_fetch_assoc($result)): ?>
+    <?php while($row = pg_fetch_assoc($result)): ?>
       <tr>
-        <td><?= htmlspecialchars($row['filename']) ?></td>
+        <td><?= htmlspecialchars($row['original_name'] ?: $row['filename']) ?></td>
         <td><?= htmlspecialchars($row['uploader']) ?></td>
-        <td><?= round($row['size']/1024,1) ?> КБ</td>
+        <td><?= $row['size'] ? round($row['size']/1024,1) . ' КБ' : '—' ?></td>
+        <td><?= dt($row['uploaded_at']) ?></td>
         <td>
           <?php if ($row['access_type']==='public'): ?>
             🌍 Публичный
           <?php elseif ($row['access_type']==='private'): ?>
             🔒 Личный
           <?php elseif ($row['access_type']==='user'): ?>
-            👤 Для <?= htmlspecialchars($row['shared_user'] ?? "удалённого пользователя") ?>
+            👤 Для <?= htmlspecialchars($row['shared_user'] ?? "—") ?>
           <?php endif; ?>
         </td>
         <td>
-          <a class="btn btn-success" href="download.php?id=<?= $row['id'] ?>">Скачать</a>
-          <?php if ($role==='admin' || $row['uploaded_by']==$user_id): ?>
-            <a class="btn btn-danger" href="delete.php?id=<?= $row['id'] ?>" onclick="return confirm('Удалить файл?')">Удалить</a>
+          <a class="btn btn-success" href="download.php?id=<?= (int)$row['id'] ?>">Скачать</a>
+          <?php if ($role==='admin' || (int)$row['uploaded_by']===$user_id): ?>
+            <a class="btn btn-danger" href="delete.php?id=<?= (int)$row['id'] ?>" onclick="return confirm('Удалить файл?')">Удалить</a>
           <?php endif; ?>
         </td>
       </tr>
     <?php endwhile; ?>
   </table>
 
-  <div class="footer-buttons">
+  <div class="footer-buttons" style="text-align:center;margin-top:12px;">
     <a href="upload_form.php" class="btn">Загрузить файл</a>
     <?php if ($role==='admin'): ?>
       <a href="admin.php" class="btn">Админ-панель</a>
@@ -111,6 +82,5 @@ $result = pg_query_params($conn, $query, [$user_id]);
     <a href="logout.php" class="btn btn-danger">Выйти</a>
   </div>
 </div>
-
 </body>
 </html>
