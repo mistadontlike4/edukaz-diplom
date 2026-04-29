@@ -97,11 +97,40 @@ $files = @pg_query($conn, "
   ORDER BY f.id DESC
 ");
 
-// Хвост логов синка
+// Хвост логов синка (локальный файл)
 $logfile = __DIR__ . "/sync_log.txt";
 $log_text = file_exists($logfile) ? file($logfile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) : [];
 $tail = implode("\n", array_slice($log_text, -300));
 
+// Источник лога для вывода в мониторинге
+$tail_source = "Локальный файл sync_log.txt";
+$tail_to_show = $tail;
+
+// На Railway локальный файл не обновляется при запуске синхронизации из LAN,
+// поэтому (при наличии таблицы sync_logs) читаем лог из Railway PostgreSQL.
+if ($on_railway) {
+  $q = @pg_query($conn, "SELECT to_char(ts,'YYYY-MM-DD HH24:MI:SS') AS ts, origin, message
+                         FROM sync_logs
+                         ORDER BY ts DESC
+                         LIMIT 300");
+  if ($q) {
+    $rows = [];
+    while ($r = pg_fetch_assoc($q)) $rows[] = $r;
+    $rows = array_reverse($rows); // показываем по времени сверху вниз
+    $lines = [];
+    foreach ($rows as $r) {
+      $lines[] = "[".$r['ts']."] (".$r['origin'].") ".$r['message'];
+    }
+    $tail_to_show = implode("\n", $lines);
+    $tail_source = "Railway PostgreSQL (таблица sync_logs)";
+  } else {
+    $err = pg_last_error($conn);
+    // Частая причина: таблица sync_logs ещё не создана
+    $tail_to_show = "⚠ Лог из БД недоступен. ".($err ? $err : "Нет деталей")
+                  ."\nСоздайте таблицу sync_logs в Railway PostgreSQL и добавьте запись логов из sync.php.";
+    $tail_source = "Railway PostgreSQL (ошибка чтения)";
+  }
+}
 // Запуск синка из UI
 $sync_response = null;
 if (isset($_GET['do']) && $_GET['do']==='sync') {
@@ -292,7 +321,9 @@ if (isset($_GET['do']) && $_GET['do']==='sync') {
         </div>
       <?php endif; ?>
 
-      <pre class="log"><?= h($tail) ?></pre>
+      <div class="muted" style="margin-bottom:6px;">Источник лога: <?= h($tail_source) ?></div>
+
+      <pre class="log"><?= h($tail_to_show) ?></pre>
 
       <div class="tabs" style="justify-content:space-between;margin-top:10px;">
         <a href="index.php" class="btn">⬅ На главную</a>
