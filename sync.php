@@ -26,7 +26,7 @@ function logmsg($m){
   if (!empty($remote_conn)) {
     @pg_query_params(
       $remote_conn,
-      "INSERT INTO sync_logs(origin, message) VALUES ($1, $2)",
+      'INSERT INTO sync_logs(origin, message) VALUES ($1, $2)',
       [$origin, $m]
     );
   }
