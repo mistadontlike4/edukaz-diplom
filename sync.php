@@ -20,8 +20,9 @@ if (!in_array($mode, ['pull','push','both'], true)) $mode = 'both';
 $logFile = __DIR__ . '/sync_log.txt';
 function logmsg($m){
   global $logFile, $remote_conn, $origin;
-  // 1) Локальный файловый лог (как было)
-  file_put_contents($logFile, "[".date("Y-m-d H:i:s")."] $m\n", FILE_APPEND);
+  $line = "[".date("Y-m-d H:i:s")."] $m";
+  // 1) Локальный файловый лог
+  file_put_contents($logFile, $line."\n", FILE_APPEND);
   // 2) Централизованный лог в Railway PostgreSQL (если доступно подключение)
   if (!empty($remote_conn)) {
     @pg_query_params(
@@ -73,11 +74,6 @@ if (!$remote_conn) {
   else { echo "<h3 style='color:#b02a37'>$msg</h3>"; }
   exit;
 }
-
-// гарантируем наличие таблицы sync_logs на Railway для мониторинга (даже если локальная БД временно недоступна)
-@pg_query($remote_conn, "CREATE TABLE IF NOT EXISTS sync_logs (\n  id BIGSERIAL PRIMARY KEY,\n  ts TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  origin VARCHAR(20) NOT NULL,\n  message TEXT NOT NULL\n);");
-@pg_query($remote_conn, "CREATE INDEX IF NOT EXISTS idx_sync_logs_ts ON sync_logs(ts);");
-
 if (!$local_conn) {
   $msg = "❌ Локальная БД недоступна: ".($local_err ?: 'нет деталей');
   logmsg($msg);
@@ -118,7 +114,7 @@ $schema_sql = [
   "ALTER TABLE files
      DROP CONSTRAINT IF EXISTS files_shared_with_fkey,
      ADD  CONSTRAINT files_shared_with_fkey
-       FOREIGN KEY (shared_with) REFERENCES users(id) ON DELETE SET NULL;",
+       FOREIGN KEY (shared_with) REFERENCES users(id) ON DELETE SET NULL;"
   "CREATE TABLE IF NOT EXISTS sync_logs (
     id BIGSERIAL PRIMARY KEY,
     ts TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -126,7 +122,6 @@ $schema_sql = [
     message TEXT NOT NULL
   );",
   "CREATE INDEX IF NOT EXISTS idx_sync_logs_ts ON sync_logs(ts);",
-
 ];
 foreach ([$local_conn,$remote_conn] as $cx) foreach ($schema_sql as $sql) @pg_query($cx, $sql);
 
