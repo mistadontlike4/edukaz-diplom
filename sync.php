@@ -118,7 +118,7 @@ $schema_sql = [
   "ALTER TABLE files
      DROP CONSTRAINT IF EXISTS files_shared_with_fkey,
      ADD  CONSTRAINT files_shared_with_fkey
-       FOREIGN KEY (shared_with) REFERENCES users(id) ON DELETE SET NULL;"
+       FOREIGN KEY (shared_with) REFERENCES users(id) ON DELETE SET NULL;",
   "CREATE TABLE IF NOT EXISTS sync_logs (
     id BIGSERIAL PRIMARY KEY,
     ts TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
