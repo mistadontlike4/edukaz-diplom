@@ -20,10 +20,9 @@ if (!in_array($mode, ['pull','push','both'], true)) $mode = 'both';
 $logFile = __DIR__ . '/sync_log.txt';
 function logmsg($m){
   global $logFile, $remote_conn, $origin;
-  $line = "[".date("Y-m-d H:i:s")."] $m";
   // 1) Локальный файловый лог
-  file_put_contents($logFile, $line."\n", FILE_APPEND);
-  // 2) Централизованный лог в Railway PostgreSQL (если доступно подключение)
+  file_put_contents($logFile, "[".date("Y-m-d H:i:s")."] $m\n", FILE_APPEND);
+  // 2) Централизованный лог в Railway PostgreSQL (таблица sync_logs)
   if (!empty($remote_conn)) {
     @pg_query_params(
       $remote_conn,
@@ -82,6 +81,11 @@ if (!$local_conn) {
   exit;
 }
 
+// Подготовка таблицы централизованного лога на Railway (нужна для мониторинга в облаке)
+@pg_query($remote_conn, "CREATE TABLE IF NOT EXISTS sync_logs (\n  id BIGSERIAL PRIMARY KEY,\n  ts TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  origin VARCHAR(20) NOT NULL,\n  message TEXT NOT NULL\n);");
+@pg_query($remote_conn, "CREATE INDEX IF NOT EXISTS idx_sync_logs_ts ON sync_logs(ts);");
+
+
 // === МИНИ-МИГРАЦИИ (на обеих БД безопасно) ===
 $schema_sql = [
   "CREATE TABLE IF NOT EXISTS users (
@@ -114,14 +118,10 @@ $schema_sql = [
   "ALTER TABLE files
      DROP CONSTRAINT IF EXISTS files_shared_with_fkey,
      ADD  CONSTRAINT files_shared_with_fkey
-       FOREIGN KEY (shared_with) REFERENCES users(id) ON DELETE SET NULL;"
-  "CREATE TABLE IF NOT EXISTS sync_logs (
-    id BIGSERIAL PRIMARY KEY,
-    ts TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    origin VARCHAR(20) NOT NULL,
-    message TEXT NOT NULL
-  );",
-  "CREATE INDEX IF NOT EXISTS idx_sync_logs_ts ON sync_logs(ts);",
+       FOREIGN KEY (shared_with) REFERENCES users(id) ON DELETE SET NULL;",
+  "CREATE TABLE IF NOT EXISTS sync_logs (\n    id BIGSERIAL PRIMARY KEY,\n    ts TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    origin VARCHAR(20) NOT NULL,\n    message TEXT NOT NULL\n  );",
+  "CREATE INDEX IF NOT EXISTS idx_sync_logs_ts ON sync_logs(ts);"
+
 ];
 foreach ([$local_conn,$remote_conn] as $cx) foreach ($schema_sql as $sql) @pg_query($cx, $sql);
 
