@@ -1,19 +1,11 @@
 <?php
-/**
- * sync.php — двунаправленная синхронизация Local <-> Railway
- * Режимы: ?mode=pull | push | both (по умолчанию both)
- * Форматы ответа:
- *   - по умолчанию HTML (красиво в браузере)
- *   - ?plain=1  — чистый текст (для лог-бокса в админке)
- *
- * Логи: sync_log.txt в корне проекта
- */
+
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 date_default_timezone_set('Asia/Almaty');
 
-$plain = isset($_GET['plain']);                 // <— ключ: чистый текст
+$plain = isset($_GET['plain']);                
 $mode  = $_GET['mode'] ?? 'both';
 if (!in_array($mode, ['pull','push','both'], true)) $mode = 'both';
 

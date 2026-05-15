@@ -311,7 +311,7 @@ if (isset($_GET['do']) && $_GET['do']==='sync') {
       <?php if ($on_railway): ?>
         <div class="note" style="margin-bottom:10px;">
           ⚠ Эти операции выполняются <b>только с локального сайта</b> (http://localhost/edukaz/admin.php).
-          Контейнер Railway не может подключаться к вашей локальной PostgreSQL.
+          Контейнер Railway не имеет доступа к локальной PostgreSQL.
         </div>
       <?php endif; ?>
 
